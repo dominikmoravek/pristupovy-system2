@@ -3,156 +3,201 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RFID Dashboard | Secure Access</title>
+    <title>RFID AI Dashboard | Voice & Stats</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { background: #0f172a; color: white; font-family: sans-serif; }
         .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
         .status-ok { color: #4ade80; font-weight: bold; }
         .status-denied { color: #f87171; font-weight: bold; }
+        canvas { max-height: 250px !important; }
+        .btn-action { transition: all 0.2s; }
+        .btn-action:active { transform: scale(0.95); }
     </style>
 </head>
 <body class="p-4 md:p-8">
-    <div class="max-w-4xl mx-auto">
-        <header class="flex justify-between items-center mb-8">
-            <h1 class="text-2xl font-bold uppercase tracking-tight">RFID <span class="text-blue-500">System</span></h1>
-            <button id="connect" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl transition-all shadow-lg">
-                PŘIPOJIT USB
-            </button>
+    <div class="max-w-5xl mx-auto">
+        <header class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+            <h1 class="text-2xl font-bold uppercase tracking-widest text-blue-400">RFID <span class="text-white">Voice System</span></h1>
+            <div class="flex gap-3">
+                <button id="clear-btn" class="btn-action bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded-2xl border border-white/10 text-xs font-bold">
+                    SMAZAT HISTORII
+                </button>
+                <button id="connect" class="btn-action bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-2xl shadow-xl font-bold">
+                    PŘIPOJIT USB
+                </button>
+            </div>
         </header>
 
-        <div class="mb-6 p-4 bg-black/40 rounded-xl border border-blue-500/20 font-mono text-xs">
-            <span class="text-blue-400 font-bold">STAV:</span> <span id="debug-text">Čekám na kliknutí...</span>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <div class="lg:col-span-2 glass p-6 rounded-3xl">
+                <canvas id="timeChart"></canvas>
+            </div>
+            
+            <div class="flex flex-col gap-4">
+                <div class="glass p-5 rounded-2xl flex justify-between items-center border-l-4 border-blue-500">
+                    <span class="text-gray-400 text-xs font-bold">STAV</span>
+                    <span id="debug-text" class="text-blue-400 font-mono text-xs">ODPOJENO</span>
+                </div>
+                <div class="glass p-6 rounded-2xl text-center">
+                    <p class="text-green-400 text-[10px] font-bold uppercase tracking-widest mb-1">Povolené</p>
+                    <h2 id="ok-count" class="text-5xl font-black">0</h2>
+                </div>
+                <div class="glass p-6 rounded-2xl text-center">
+                    <p class="text-red-400 text-[10px] font-bold uppercase tracking-widest mb-1">Zamitnuté</p>
+                    <h2 id="denied-count" class="text-5xl font-black">0</h2>
+                </div>
+            </div>
         </div>
 
-        <div class="grid grid-cols-3 gap-4 mb-8 text-center">
-            <div class="glass p-4 rounded-2xl">
-                <p class="text-gray-400 text-xs">CELKEM</p>
-                <h2 id="total-count" class="text-3xl font-bold">0</h2>
-            </div>
-            <div class="glass p-4 rounded-2xl">
-                <p class="text-green-500 text-xs text-green-400 font-bold">POVOLENO</p>
-                <h2 id="ok-count" class="text-3xl font-bold text-green-400">0</h2>
-            </div>
-            <div class="glass p-4 rounded-2xl">
-                <p class="text-red-500 text-xs text-red-400 font-bold">ZAMÍTNUTO</p>
-                <h2 id="denied-count" class="text-3xl font-bold text-red-400">0</h2>
-            </div>
-        </div>
-
-        <div class="glass rounded-2xl overflow-hidden">
-            <table class="w-full text-left border-collapse">
-                <thead class="bg-white/10 text-gray-400 uppercase text-[10px] tracking-widest">
+        <div class="glass rounded-3xl overflow-hidden shadow-2xl">
+            <table class="w-full text-left">
+                <thead class="bg-white/5 text-gray-500 uppercase text-[10px] tracking-widest">
                     <tr>
-                        <th class="p-4">Čas</th>
-                        <th class="p-4">Výsledek</th>
-                        <th class="p-4">Identifikátor (UID)</th>
+                        <th class="p-5">Čas</th>
+                        <th class="p-5">Uživatel / ID</th>
+                        <th class="p-5">Výsledek</th>
                     </tr>
                 </thead>
-                <tbody id="log-table" class="text-sm">
-                    </tbody>
+                <tbody id="log-table" class="text-sm"></tbody>
             </table>
         </div>
     </div>
 
     <script>
+        // --- KONFIGURACE UŽIVATELŮ ---
+        const userDatabase = {
+            "1226DA53": "Petr",
+            "AABBCCDD": "Host",
+            "11223344": "Sklad"
+        };
+
         let port;
         let stats = { total: 0, ok: 0, denied: 0 };
+        let hourlyData = new Array(24).fill(0);
         const debug = document.getElementById('debug-text');
 
-        // Funkce pro připojení
-        document.getElementById('connect').addEventListener('click', async () => {
-            const btn = document.getElementById('connect');
-            try {
-                debug.innerText = "Vybírám port...";
-                port = await navigator.serial.requestPort();
-                
-                // Otevření portu se signály pro Arduino
-                await port.open({ baudRate: 9600 });
-                await port.setSignals({ dataTerminalReady: true, requestToSend: true });
+        // Inicializace Hlasu
+        const synth = window.speechSynthesis;
+        function promluv(text) {
+            if (synth.speaking) synth.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'cs-CZ';
+            utterance.rate = 1.0;
+            synth.speak(utterance);
+        }
 
-                debug.innerText = "PŘIPOJENO. Čekám na kartu...";
-                
-                if (btn) {
-                    btn.innerText = "⚡ AKTIVNÍ";
-                    btn.style.background = "#16a34a"; // Změna na zelenou
+        // Inicializace Grafu
+        const ctx = document.getElementById('timeChart').getContext('2d');
+        const timeChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array.from({length: 24}, (_, i) => i + ":00"),
+                datasets: [{
+                    label: 'Vstupy',
+                    data: hourlyData,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    x: { grid: { display: false } }
                 }
-                
-                readLoop();
-            } catch (e) {
-                debug.innerText = "CHYBA: " + e.message;
-                console.error(e);
             }
         });
 
-        // Smyčka pro čtení dat
+        // Smazat historii
+        document.getElementById('clear-btn').addEventListener('click', () => {
+            if(confirm("Opravdu smazat historii a grafy?")) {
+                document.getElementById('log-table').innerHTML = "";
+                stats = { total: 0, ok: 0, denied: 0 };
+                hourlyData.fill(0);
+                timeChart.update();
+                document.getElementById('ok-count').innerText = 0;
+                document.getElementById('denied-count').innerText = 0;
+                promluv("Historie byla vymazána");
+            }
+        });
+
+        // Připojení k USB
+        document.getElementById('connect').addEventListener('click', async () => {
+            try {
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 9600 });
+                await port.setSignals({ dataTerminalReady: true, requestToSend: true });
+                debug.innerText = "ONLINE";
+                document.getElementById('connect').innerText = "⚡ SYSTÉM BĚŽÍ";
+                document.getElementById('connect').classList.add('bg-green-600');
+                promluv("Systém připojen a připraven k provozu");
+                readLoop();
+            } catch (e) {
+                debug.innerText = "CHYBA";
+                alert("Chyba připojení: " + e.message);
+            }
+        });
+
         async function readLoop() {
             const textDecoder = new TextDecoderStream();
-            const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+            port.readable.pipeTo(textDecoder.writable);
             const reader = textDecoder.readable.getReader();
-
             let buffer = "";
 
-            try {
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    
-                    buffer += value;
-                    
-                    // Zpracování řádků
-                    if (buffer.includes("\n")) {
-                        const lines = buffer.split(/\r?\n/);
-                        buffer = lines.pop();
-                        
-                        lines.forEach(line => {
-                            if (line.trim().length > 0) {
-                                debug.innerText = "PŘIJATO: " + line.trim();
-                                processData(line.trim());
-                            }
-                        });
-                    }
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                buffer += value;
+                if (buffer.includes("\n")) {
+                    const lines = buffer.split(/\r?\n/);
+                    buffer = lines.pop();
+                    lines.forEach(line => {
+                        if (line.trim()) processData(line.trim());
+                    });
                 }
-            } catch (err) {
-                debug.innerText = "CHYBA ČTENÍ: " + err.message;
             }
         }
 
-        // Zpracování zpráv z Arduina
         function processData(line) {
-            const now = new Date().toLocaleTimeString('cs-CZ');
-            let status = "", sClass = "", uid = "---";
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('cs-CZ');
+            const hour = now.getHours();
 
-            if (line.includes("ACCESS_OK")) {
-                status = "POVOLENO";
-                sClass = "status-ok";
-                uid = line.split(":")[1] || "---";
-                stats.ok++;
-            } else if (line.includes("ACCESS_DENIED")) {
-                status = "ZAMÍTNUTO";
-                sClass = "status-denied";
-                uid = line.split(":")[1] || "---";
-                stats.denied++;
-            } else {
-                return; // Ignorujeme jiné zprávy
+            if (line.includes("ACCESS_OK") || line.includes("ACCESS_DENIED")) {
+                const [type, uid] = line.split(":");
+                const name = userDatabase[uid] || `Neznámý uživatel`;
+
+                if (type === "ACCESS_OK") {
+                    stats.ok++;
+                    hourlyData[hour]++;
+                    timeChart.update();
+                    promluv(`Vítejte, ${name}. Přístup povolen.`);
+                    addTableRow(timeStr, name, "POVOLENO", "status-ok");
+                } else {
+                    stats.denied++;
+                    promluv("Přístup odepřen. Neplatná karta.");
+                    addTableRow(timeStr, `Karta: ${uid}`, "ZAMÍTNUTO", "status-denied");
+                }
+                
+                document.getElementById('ok-count').innerText = stats.ok;
+                document.getElementById('denied-count').innerText = stats.denied;
             }
+        }
 
-            stats.total++;
-
-            // Update statistik na webu
-            document.getElementById('total-count').innerText = stats.total;
-            document.getElementById('ok-count').innerText = stats.ok;
-            document.getElementById('denied-count').innerText = stats.denied;
-
-            // Přidání řádku do tabulky
+        function addTableRow(time, user, status, sClass) {
             const table = document.getElementById('log-table');
             const row = table.insertRow(0);
-            row.style.borderBottom = "1px solid rgba(255,255,255,0.05)";
+            row.className = "border-b border-white/5 bg-white/0 hover:bg-white/5 transition-all animate-pulse";
             row.innerHTML = `
-                <td class="p-4 text-gray-500 font-mono text-xs">${now}</td>
-                <td class="p-4 ${sClass}">${status}</td>
-                <td class="p-4 font-mono text-blue-300">${uid}</td>
+                <td class="p-5 text-gray-500 font-mono text-xs">${time}</td>
+                <td class="p-5 font-bold text-blue-200">${user}</td>
+                <td class="p-5 ${sClass}">${status}</td>
             `;
+            setTimeout(() => row.classList.remove('animate-pulse'), 1000);
         }
     </script>
 </body>
