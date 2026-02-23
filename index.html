@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RFID Professional System v4</title>
+    <title>RFID Professional System v5</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -15,7 +15,6 @@
         .status-ok { color: #4ade80; }
         .status-denied { color: #f87171; }
         .user-link:hover { cursor: pointer; color: #3b82f6; background: rgba(59, 130, 246, 0.1); border-radius: 8px; }
-        .avatar-img { object-fit: cover; border: 2px solid rgba(255,255,255,0.1); }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -31,7 +30,7 @@
             
             <div class="flex flex-wrap justify-center gap-3">
                 <button id="show-chart-btn" class="bg-white/5 hover:bg-white/10 px-5 py-3 rounded-2xl border border-white/10 text-[10px] font-bold transition-all uppercase tracking-widest">
-                    📊 Aktivita
+                    📊 Celková Aktivita
                 </button>
                 <button id="clear-btn" class="bg-red-500/10 hover:bg-red-500/20 text-red-400 px-5 py-3 rounded-2xl border border-red-500/20 text-[10px] font-bold transition-all uppercase tracking-widest">
                     Smazat
@@ -44,11 +43,11 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 text-center">
             <div class="glass p-8 rounded-[2rem] border-t-2 border-emerald-500/30">
-                <p class="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-2">Povolené vstupy</p>
-                <h2 id="ok-count" class="text-6xl font-black italic">0</h2>
+                <p class="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-2">Autorizováno</p>
+                <h2 id="ok-count" class="text-6xl font-black italic text-emerald-400">0</h2>
             </div>
             <div class="glass p-8 rounded-[2rem] border-t-2 border-red-500/30">
-                <p class="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-2">Zamitnuté karty</p>
+                <p class="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-2">Odepřeno</p>
                 <h2 id="denied-count" class="text-6xl font-black italic text-red-400">0</h2>
             </div>
         </div>
@@ -58,8 +57,8 @@
                 <thead class="bg-white/5 text-gray-500 text-[10px] uppercase font-bold tracking-[0.2em]">
                     <tr>
                         <th class="p-6">Čas</th>
-                        <th class="p-6">Profil</th>
-                        <th class="p-6">Status</th>
+                        <th class="p-6">Osoba</th>
+                        <th class="p-6">Výsledek</th>
                     </tr>
                 </thead>
                 <tbody id="log-table" class="text-sm"></tbody>
@@ -68,30 +67,39 @@
     </div>
 
     <div id="modal-overlay" class="fixed inset-0 bg-black/90 backdrop-blur-xl flex items-center justify-center z-50 modal">
-        <div class="glass w-full max-w-2xl p-8 rounded-[3rem] relative mx-4 border-white/10">
+        <div id="modal-box" class="glass w-full max-w-2xl p-8 rounded-[3rem] relative mx-4 border-white/10">
             <button id="close-modal" class="absolute top-8 right-8 text-gray-400 hover:text-white text-3xl transition-transform hover:scale-125">&times;</button>
             
             <div id="modal-content">
-                <div class="flex items-center gap-6 mb-8">
-                    <img id="modal-avatar" src="anonym.jpg" class="w-24 h-24 rounded-3xl avatar-img bg-gray-800 shadow-2xl shadow-blue-500/10" onerror="this.src='anonym.jpg'">
+                <div id="user-header" class="flex items-center gap-6 mb-8 hidden">
+                    <img id="modal-avatar" src="anonym.jpg" class="w-24 h-24 rounded-3xl object-cover bg-gray-800 shadow-2xl shadow-blue-500/10" onerror="this.src='anonym.jpg'">
                     <div>
-                        <h2 id="modal-title" class="text-4xl font-black tracking-tight leading-none">Jméno</h2>
+                        <h2 id="modal-title-user" class="text-4xl font-black tracking-tight leading-none">Jméno</h2>
                         <p id="modal-uid" class="text-blue-500 font-mono text-xs mt-2 uppercase tracking-[0.3em] opacity-60"></p>
                     </div>
                 </div>
+
+                <div id="system-header" class="mb-8 hidden text-center">
+                    <h2 class="text-4xl font-black tracking-tighter uppercase text-blue-400">Statistiky Systému</h2>
+                    <p class="text-gray-500 text-xs mt-2 uppercase tracking-widest">Souhrnný přehled všech aktivit</p>
+                </div>
                 
-                <div class="grid grid-cols-2 gap-4 mb-8">
+                <div class="grid grid-cols-3 gap-4 mb-8">
                     <div class="bg-white/5 p-5 rounded-3xl border border-white/5 text-center">
-                        <p class="text-gray-500 text-[9px] uppercase font-bold tracking-widest mb-1">Autorizováno</p>
-                        <p id="modal-ok" class="text-3xl font-black text-emerald-400">0</p>
+                        <p class="text-gray-500 text-[9px] uppercase font-bold tracking-widest mb-1">OK</p>
+                        <p id="modal-ok" class="text-2xl font-black text-emerald-400">0</p>
                     </div>
                     <div class="bg-white/5 p-5 rounded-3xl border border-white/5 text-center">
-                        <p class="text-gray-500 text-[9px] uppercase font-bold tracking-widest mb-1">Odepřeno</p>
-                        <p id="modal-denied" class="text-3xl font-black text-red-400">0</p>
+                        <p class="text-gray-500 text-[9px] uppercase font-bold tracking-widest mb-1">CHYBA</p>
+                        <p id="modal-denied" class="text-2xl font-black text-red-400">0</p>
+                    </div>
+                    <div class="bg-white/5 p-5 rounded-3xl border border-white/5 text-center bg-blue-500/5">
+                        <p class="text-blue-400 text-[9px] uppercase font-bold tracking-widest mb-1">ÚSPĚŠNOST</p>
+                        <p id="modal-ratio" class="text-2xl font-black text-blue-400">0%</p>
                     </div>
                 </div>
 
-                <div class="h-60">
+                <div class="h-64">
                     <canvas id="modalChart"></canvas>
                 </div>
             </div>
@@ -99,7 +107,7 @@
     </div>
 
     <script>
-        // --- DATA ---
+        // --- KONFIGURACE ---
         const userDatabase = {
             "1226DA53": "Petr Správce",
             "AABBCCDD": "Návštěva 1"
@@ -120,7 +128,8 @@
             synth.speak(u);
         }
 
-        function initModalChart(dataArray) {
+        // --- GRAFY ---
+        function initModalChart(dataArray, color = '#3b82f6') {
             const ctx = document.getElementById('modalChart').getContext('2d');
             if (modalChartObj) modalChartObj.destroy();
             modalChartObj = new Chart(ctx, {
@@ -128,11 +137,10 @@
                 data: {
                     labels: Array.from({length: 24}, (_, i) => i + "h"),
                     datasets: [{
-                        label: 'Frekvence přístupů',
                         data: dataArray,
-                        backgroundColor: 'rgba(59, 130, 246, 0.6)',
-                        borderRadius: 12,
-                        hoverBackgroundColor: '#3b82f6'
+                        backgroundColor: color + '99',
+                        borderRadius: 8,
+                        hoverBackgroundColor: color
                     }]
                 },
                 options: { 
@@ -147,42 +155,56 @@
             });
         }
 
-        // --- HANDLERY ---
+        // --- MODÁLY ---
+        function calculateRatio(ok, denied) {
+            const total = ok + denied;
+            if (total === 0) return "0%";
+            return Math.round((ok / total) * 100) + "%";
+        }
+
         document.getElementById('show-chart-btn').onclick = () => {
-            document.getElementById('modal-title').innerText = "Celková aktivita";
-            document.getElementById('modal-uid').innerText = "Všechny karty";
-            document.getElementById('modal-avatar').src = 'anonym.jpg'; 
+            document.getElementById('user-header').classList.add('hidden');
+            document.getElementById('system-header').classList.remove('hidden');
+            document.getElementById('modal-box').classList.replace('max-w-2xl', 'max-w-4xl'); // Zvětšení pro celkový graf
+            
             document.getElementById('modal-ok').innerText = stats.ok;
             document.getElementById('modal-denied').innerText = stats.denied;
+            document.getElementById('modal-ratio').innerText = calculateRatio(stats.ok, stats.denied);
+            
             openModal();
-            initModalChart(globalHourly);
+            initModalChart(globalHourly, '#60a5fa');
         };
 
         function showUserProfile(uid) {
+            document.getElementById('system-header').classList.add('hidden');
+            document.getElementById('user-header').classList.remove('hidden');
+            document.getElementById('modal-box').classList.replace('max-w-4xl', 'max-w-2xl');
+            
             const user = userData[uid] || { ok: 0, denied: 0, hourly: new Array(24).fill(0) };
             const name = userDatabase[uid] || `Neznámý (${uid})`;
             
-            document.getElementById('modal-title').innerText = name;
-            document.getElementById('modal-uid').innerText = `IDENT: ${uid}`;
-            document.getElementById('modal-avatar').src = `${uid}.jpg`; // Hledá fotku podle UID
+            document.getElementById('modal-title-user').innerText = name;
+            document.getElementById('modal-uid').innerText = `ID: ${uid}`;
+            document.getElementById('modal-avatar').src = `${uid}.jpg`;
             document.getElementById('modal-ok').innerText = user.ok;
             document.getElementById('modal-denied').innerText = user.denied;
+            document.getElementById('modal-ratio').innerText = calculateRatio(user.ok, user.denied);
             
             openModal();
-            initModalChart(user.hourly);
+            initModalChart(user.hourly, '#10b981');
         }
 
         function openModal() { document.getElementById('modal-overlay').classList.add('active'); }
         document.getElementById('close-modal').onclick = () => document.getElementById('modal-overlay').classList.remove('active');
 
-        // --- USB LOGIKA ---
+        // --- KOMUNIKACE ---
         document.getElementById('connect').onclick = async () => {
             try {
                 port = await navigator.serial.requestPort();
                 await port.open({ baudRate: 9600 });
                 await port.setSignals({ dataTerminalReady: true, requestToSend: true });
                 debug.innerText = "STAV: SYSTÉM AKTIVNÍ";
-                promluv("Terminál autorizován.");
+                promluv("Terminál připojen.");
                 readLoop();
             } catch (e) { debug.innerText = "STAV: CHYBA PŘIPOJENÍ"; }
         };
@@ -224,7 +246,7 @@
                 stats.denied++;
                 userData[uid].denied++;
                 promluv("Vstup odepřen");
-                addLogRow(now.toLocaleTimeString('cs-CZ'), uid, "Neautorizováno", "ZAMÍTNUTO", "status-denied");
+                addLogRow(now.toLocaleTimeString('cs-CZ'), uid, "Neznámý", "ZAMÍTNUTO", "status-denied");
             }
 
             document.getElementById('ok-count').innerText = stats.ok;
@@ -234,20 +256,15 @@
         function addLogRow(time, uid, name, status, sClass) {
             const table = document.getElementById('log-table');
             const row = table.insertRow(0);
-            row.className = "border-b border-white/5 hover:bg-white/5 transition-all group";
+            row.className = "border-b border-white/5 hover:bg-white/5 transition-all";
             row.innerHTML = `
                 <td class="p-6 text-gray-500 font-mono text-xs">${time}</td>
-                <td class="p-6">
-                    <div class="flex items-center gap-3">
-                        <img src="${uid}.jpg" onerror="this.src='anonym.jpg'" class="w-8 h-8 rounded-lg bg-white/5 object-cover">
-                        <span class="user-link px-2 py-1 font-bold" onclick="showUserProfile('${uid}')">${name}</span>
-                    </div>
-                </td>
-                <td class="p-6 ${sClass} font-black uppercase italic tracking-tighter">${status}</td>
+                <td class="p-6 font-bold cursor-pointer"><span class="user-link px-3 py-2" onclick="showUserProfile('${uid}')">${name}</span></td>
+                <td class="p-6 ${sClass} font-black uppercase italic">${status}</td>
             `;
         }
 
-        document.getElementById('clear-btn').onclick = () => { if(confirm("Smazat všechna sezení?")) location.reload(); };
+        document.getElementById('clear-btn').onclick = () => { if(confirm("Restartovat systém?")) location.reload(); };
     </script>
 </body>
 </html>
