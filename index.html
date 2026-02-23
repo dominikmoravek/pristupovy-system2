@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>RFID Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #0f172a; color: white; font-family: sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+        .status-ok { color: #4ade80; text-shadow: 0 0 10px #4ade80; }
+        .status-denied { color: #f87171; text-shadow: 0 0 10px #f87171; }
+    </style>
+</head>
+<body class="p-8">
+    <div class="max-w-4xl mx-auto">
+        <header class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold italic">RFID <span class="text-blue-500">Secure</span>System</h1>
+            <button id="connect" class="bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded-full transition-all shadow-lg shadow-blue-500/20">
+                Připojit USB
+            </button>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="glass p-6 rounded-2xl text-center">
+                <p class="text-gray-400">Celkem vstupů</p>
+                <h2 id="total-count" class="text-4xl font-bold">0</h2>
+            </div>
+            <div class="glass p-6 rounded-2xl text-center border-green-500/30">
+                <p class="text-gray-400">Povolené</p>
+                <h2 id="ok-count" class="text-4xl font-bold text-green-400">0</h2>
+            </div>
+            <div class="glass p-6 rounded-2xl text-center border-red-500/30">
+                <p class="text-gray-400">Zamitnuté</p>
+                <h2 id="denied-count" class="text-4xl font-bold text-red-400">0</h2>
+            </div>
+        </div>
+
+        <div class="glass rounded-2xl overflow-hidden">
+            <table class="w-full text-left">
+                <thead class="bg-white/10 text-gray-300">
+                    <tr>
+                        <th class="p-4">Čas</th>
+                        <th class="p-4">Status</th>
+                        <th class="p-4">UID Karty</th>
+                    </tr>
+                </thead>
+                <tbody id="log-table">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let port;
+        let reader;
+        let stats = { total: 0, ok: 0, denied: 0 };
+
+        document.getElementById('connect').addEventListener('click', async () => {
+            try {
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 9600 });
+                document.getElementById('connect').innerText = "⚡ Připojeno";
+                readLoop();
+            } catch (e) {
+                console.error("Chyba:", e);
+            }
+        });
+
+        async function readLoop() {
+            const textDecoder = new TextDecoderStream();
+            const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+            reader = textDecoder.readable.getReader();
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                if (value) {
+                    processData(value.trim());
+                }
+            }
+        }
+
+        function processData(line) {
+            const now = new Date().toLocaleTimeString();
+            let statusText = "";
+            let statusClass = "";
+            let uid = "---";
+
+            if (line.includes("ACCESS_OK")) {
+                statusText = "POVOLENO";
+                statusClass = "status-ok";
+                stats.ok++;
+            } else if (line.includes("ACCESS_DENIED")) {
+                statusText = "ZAMÍTNUTO";
+                statusClass = "status-denied";
+                uid = line.split(":")[1] || "Neznámé";
+                stats.denied++;
+            } else {
+                return; // Ignorujeme ostatní zprávy
+            }
+
+            stats.total++;
+            updateDashboard(now, statusText, statusClass, uid);
+        }
+
+        function updateDashboard(time, status, sClass, uid) {
+            // Update čísel
+            document.getElementById('total-count').innerText = stats.total;
+            document.getElementById('ok-count').innerText = stats.ok;
+            document.getElementById('denied-count').innerText = stats.denied;
+
+            // Přidání řádku do tabulky s animací
+            const table = document.getElementById('log-table');
+            const row = table.insertRow(0);
+            row.className = "border-b border-white/5 animate-pulse";
+            row.innerHTML = `
+                <td class="p-4 text-gray-400">${time}</td>
+                <td class="p-4 font-bold ${sClass}">${status}</td>
+                <td class="p-4 font-mono">${uid}</td>
+            `;
+            setTimeout(() => row.classList.remove('animate-pulse'), 1000);
+        }
+    </script>
+</body>
+</html>
