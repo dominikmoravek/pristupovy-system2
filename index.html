@@ -2,51 +2,55 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>RFID Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RFID Dashboard | Secure Access</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background: #0f172a; color: white; font-family: sans-serif; }
         .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
-        .status-ok { color: #4ade80; }
-        .status-denied { color: #f87171; }
+        .status-ok { color: #4ade80; font-weight: bold; }
+        .status-denied { color: #f87171; font-weight: bold; }
     </style>
 </head>
-<body class="p-4 md:p-8 text-sm">
+<body class="p-4 md:p-8">
     <div class="max-w-4xl mx-auto">
         <header class="flex justify-between items-center mb-8">
-            <h1 class="text-2xl font-bold">RFID <span class="text-blue-500">System</span></h1>
-            <button id="connect" class="bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded-xl transition-all">PŘIPOJIT USB</button>
+            <h1 class="text-2xl font-bold uppercase tracking-tight">RFID <span class="text-blue-500">System</span></h1>
+            <button id="connect" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl transition-all shadow-lg">
+                PŘIPOJIT USB
+            </button>
         </header>
 
-        <div class="mb-6 p-3 bg-black/50 rounded-lg font-mono text-xs text-blue-300 border border-blue-500/30">
-            <strong>Debug konzole:</strong> <span id="debug-text">Čekám na připojení...</span>
+        <div class="mb-6 p-4 bg-black/40 rounded-xl border border-blue-500/20 font-mono text-xs">
+            <span class="text-blue-400 font-bold">STAV:</span> <span id="debug-text">Čekám na kliknutí...</span>
         </div>
 
         <div class="grid grid-cols-3 gap-4 mb-8 text-center">
             <div class="glass p-4 rounded-2xl">
-                <p class="text-gray-400 text-xs uppercase">Vstupů</p>
+                <p class="text-gray-400 text-xs">CELKEM</p>
                 <h2 id="total-count" class="text-3xl font-bold">0</h2>
             </div>
-            <div class="glass p-4 rounded-2xl border-green-500/20">
-                <p class="text-gray-400 text-xs uppercase text-green-400">OK</p>
+            <div class="glass p-4 rounded-2xl">
+                <p class="text-green-500 text-xs text-green-400 font-bold">POVOLENO</p>
                 <h2 id="ok-count" class="text-3xl font-bold text-green-400">0</h2>
             </div>
-            <div class="glass p-4 rounded-2xl border-red-500/20">
-                <p class="text-gray-400 text-xs uppercase text-red-400">CHYBA</p>
+            <div class="glass p-4 rounded-2xl">
+                <p class="text-red-500 text-xs text-red-400 font-bold">ZAMÍTNUTO</p>
                 <h2 id="denied-count" class="text-3xl font-bold text-red-400">0</h2>
             </div>
         </div>
 
         <div class="glass rounded-2xl overflow-hidden">
             <table class="w-full text-left border-collapse">
-                <thead class="bg-white/10">
+                <thead class="bg-white/10 text-gray-400 uppercase text-[10px] tracking-widest">
                     <tr>
                         <th class="p-4">Čas</th>
-                        <th class="p-4">Status</th>
-                        <th class="p-4">UID Karty</th>
+                        <th class="p-4">Výsledek</th>
+                        <th class="p-4">Identifikátor (UID)</th>
                     </tr>
                 </thead>
-                <tbody id="log-table"></tbody>
+                <tbody id="log-table" class="text-sm">
+                    </tbody>
             </table>
         </div>
     </div>
@@ -56,19 +60,32 @@
         let stats = { total: 0, ok: 0, denied: 0 };
         const debug = document.getElementById('debug-text');
 
+        // Funkce pro připojení
         document.getElementById('connect').addEventListener('click', async () => {
+            const btn = document.getElementById('connect');
             try {
+                debug.innerText = "Vybírám port...";
                 port = await navigator.serial.requestPort();
+                
+                // Otevření portu se signály pro Arduino
                 await port.open({ baudRate: 9600 });
-                document.getElementById('connect').innerText = "⚡ AKTIVNÍ";
-                document.getElementById('connect').classList.replace('bg-blue-600', 'bg-green-600');
-                debug.innerText = "Připojeno! Přiložte kartu k Arduinu.";
+                await port.setSignals({ dataTerminalReady: true, requestToSend: true });
+
+                debug.innerText = "PŘIPOJENO. Čekám na kartu...";
+                
+                if (btn) {
+                    btn.innerText = "⚡ AKTIVNÍ";
+                    btn.style.background = "#16a34a"; // Změna na zelenou
+                }
+                
                 readLoop();
             } catch (e) {
                 debug.innerText = "CHYBA: " + e.message;
+                console.error(e);
             }
         });
 
+        // Smyčka pro čtení dat
         async function readLoop() {
             const textDecoder = new TextDecoderStream();
             const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
@@ -82,43 +99,60 @@
                     if (done) break;
                     
                     buffer += value;
+                    
+                    // Zpracování řádků
                     if (buffer.includes("\n")) {
-                        const lines = buffer.split("\n");
+                        const lines = buffer.split(/\r?\n/);
                         buffer = lines.pop();
+                        
                         lines.forEach(line => {
-                            debug.innerText = "RAW data: " + line.trim();
-                            processData(line.trim());
+                            if (line.trim().length > 0) {
+                                debug.innerText = "PŘIJATO: " + line.trim();
+                                processData(line.trim());
+                            }
                         });
                     }
                 }
             } catch (err) {
-                debug.innerText = "Chyba čtení: " + err.message;
+                debug.innerText = "CHYBA ČTENÍ: " + err.message;
             }
         }
 
+        // Zpracování zpráv z Arduina
         function processData(line) {
-            const now = new Date().toLocaleTimeString();
+            const now = new Date().toLocaleTimeString('cs-CZ');
             let status = "", sClass = "", uid = "---";
 
             if (line.includes("ACCESS_OK")) {
-                status = "POVOLENO"; sClass = "status-ok";
+                status = "POVOLENO";
+                sClass = "status-ok";
                 uid = line.split(":")[1] || "---";
                 stats.ok++;
             } else if (line.includes("ACCESS_DENIED")) {
-                status = "ZAMÍTNUTO"; sClass = "status-denied";
+                status = "ZAMÍTNUTO";
+                sClass = "status-denied";
                 uid = line.split(":")[1] || "---";
                 stats.denied++;
             } else {
-                return;
+                return; // Ignorujeme jiné zprávy
             }
 
             stats.total++;
+
+            // Update statistik na webu
             document.getElementById('total-count').innerText = stats.total;
             document.getElementById('ok-count').innerText = stats.ok;
             document.getElementById('denied-count').innerText = stats.denied;
 
-            const row = document.getElementById('log-table').insertRow(0);
-            row.innerHTML = `<td class="p-4 opacity-50 text-xs">${now}</td><td class="p-4 font-bold ${sClass}">${status}</td><td class="p-4 font-mono">${uid}</td>`;
+            // Přidání řádku do tabulky
+            const table = document.getElementById('log-table');
+            const row = table.insertRow(0);
+            row.style.borderBottom = "1px solid rgba(255,255,255,0.05)";
+            row.innerHTML = `
+                <td class="p-4 text-gray-500 font-mono text-xs">${now}</td>
+                <td class="p-4 ${sClass}">${status}</td>
+                <td class="p-4 font-mono text-blue-300">${uid}</td>
+            `;
         }
     </script>
 </body>
