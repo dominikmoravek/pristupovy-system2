@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RFID SYSTEM PRO</title>
+    <title>RFID SYSTEM PRO | Final</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -12,9 +12,10 @@
         .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.08); }
         .modal { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); opacity: 0; pointer-events: none; transform: scale(0.95); }
         .modal.active { opacity: 1; pointer-events: auto; transform: scale(1); }
-        .status-ok { color: #4ade80; }
-        .status-denied { color: #f87171; }
+        .status-ok { color: #4ade80; text-shadow: 0 0 10px rgba(74, 222, 128, 0.2); }
+        .status-denied { color: #f87171; text-shadow: 0 0 10px rgba(248, 113, 113, 0.2); }
         .user-link:hover { cursor: pointer; color: #3b82f6; background: rgba(59, 130, 246, 0.1); border-radius: 8px; }
+        canvas { max-height: 200px !important; }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -25,15 +26,15 @@
                 <h1 class="text-4xl font-black tracking-tighter text-white uppercase italic">
                     RFID <span class="text-blue-500">SYSTEM</span>
                 </h1>
-                <p id="debug-text" class="text-gray-500 font-mono text-[10px] mt-1 tracking-widest uppercase">STAV: ODPOJENO</p>
+                <p id="debug-text" class="text-gray-500 font-mono text-[10px] mt-1 tracking-widest uppercase italic">STATUS: OFFLINE</p>
             </div>
             
             <div class="flex flex-wrap justify-center gap-3">
-                <button id="show-chart-btn" class="bg-white/5 hover:bg-white/10 px-5 py-3 rounded-2xl border border-white/10 text-[10px] font-bold transition-all uppercase tracking-widest">
-                    📊 Aktivita
+                <button id="show-chart-btn" class="bg-white/5 hover:bg-white/10 px-6 py-3 rounded-2xl border border-white/10 text-[10px] font-bold transition-all uppercase tracking-[0.2em]">
+                    📊 AKTIVITA SYSTÉMU
                 </button>
-                <button id="clear-btn" class="bg-red-500/10 hover:bg-red-500/20 text-red-400 px-5 py-3 rounded-2xl border border-red-500/20 text-[10px] font-bold transition-all uppercase tracking-widest">
-                    Smazat
+                <button id="clear-btn" class="bg-red-500/10 hover:bg-red-500/20 text-red-400 px-6 py-3 rounded-2xl border border-red-500/20 text-[10px] font-bold transition-all uppercase tracking-[0.2em]">
+                    RESTART
                 </button>
                 <button id="connect" class="bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-2xl shadow-lg shadow-blue-500/20 font-bold transition-all text-xs">
                     PŘIPOJIT USB
@@ -42,30 +43,30 @@
         </header>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 text-center">
-            <div class="glass p-8 rounded-[2rem] border-t-2 border-emerald-500/30 order-2 md:order-1">
-                <p class="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-2">Autorizováno</p>
+            <div class="glass p-8 rounded-[2.5rem] border-t-2 border-emerald-500/30">
+                <p class="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-2">Povoleno</p>
                 <h2 id="ok-count" class="text-5xl font-black italic text-emerald-400">0</h2>
             </div>
             
-            <div class="glass p-8 rounded-[2rem] border-t-2 border-blue-500/30 order-1 md:order-2 bg-blue-500/5">
-                <p class="text-blue-400 text-[10px] font-bold uppercase tracking-widest mb-2">Celkové pokusy</p>
+            <div class="glass p-8 rounded-[2.5rem] border-t-2 border-blue-500/30 bg-blue-500/5 relative overflow-hidden">
+                <p class="text-blue-400 text-[10px] font-bold uppercase tracking-widest mb-2">Celkem pokusů</p>
                 <h2 id="total-count-main" class="text-6xl font-black italic">0</h2>
-                <p id="total-ratio-main" class="text-blue-300/50 text-xs font-bold mt-1 uppercase tracking-tighter">Úspěšnost: 0%</p>
+                <p id="total-ratio-main" class="text-blue-300/50 text-[10px] font-black mt-2 uppercase tracking-widest">Úspěšnost: 0%</p>
             </div>
 
-            <div class="glass p-8 rounded-[2rem] border-t-2 border-red-500/30 order-3 md:order-3">
+            <div class="glass p-8 rounded-[2.5rem] border-t-2 border-red-500/30">
                 <p class="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-2">Odepřeno</p>
                 <h2 id="denied-count" class="text-5xl font-black italic text-red-400">0</h2>
             </div>
         </div>
 
-        <div class="glass rounded-[2rem] overflow-hidden shadow-2xl">
-            <table class="w-full text-left border-collapse">
-                <thead class="bg-white/5 text-gray-500 text-[10px] uppercase font-bold tracking-[0.2em]">
+        <div class="glass rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/5">
+            <table class="w-full text-left">
+                <thead class="bg-white/5 text-gray-500 text-[10px] uppercase font-bold tracking-[0.3em]">
                     <tr>
-                        <th class="p-6">Čas</th>
-                        <th class="p-6">Uživatel</th>
-                        <th class="p-6">Status</th>
+                        <th class="p-7">Čas záznamu</th>
+                        <th class="p-7">Identita uživatele</th>
+                        <th class="p-7">Stav vstupu</th>
                     </tr>
                 </thead>
                 <tbody id="log-table" class="text-sm"></tbody>
@@ -73,47 +74,59 @@
         </div>
     </div>
 
-    <div id="modal-overlay" class="fixed inset-0 bg-black/90 backdrop-blur-xl flex items-center justify-center z-50 modal">
-        <div id="modal-box" class="glass w-full max-w-2xl p-8 rounded-[3rem] relative mx-4 border-white/10">
-            <button id="close-modal" class="absolute top-8 right-8 text-gray-400 hover:text-white text-3xl transition-transform hover:scale-125">&times;</button>
+    <div id="modal-overlay" class="fixed inset-0 bg-black/95 backdrop-blur-2xl flex items-center justify-center z-50 modal p-4">
+        <div id="modal-box" class="glass w-full max-w-4xl p-10 rounded-[3rem] relative border-white/10 overflow-y-auto max-h-[90vh]">
+            <button id="close-modal" class="absolute top-8 right-8 text-gray-500 hover:text-white text-4xl transition-all">&times;</button>
             
             <div id="modal-content">
-                <div id="user-header" class="flex items-center gap-6 mb-8 hidden">
-                    <img id="modal-avatar" src="anonym.jpg" class="w-24 h-24 rounded-3xl object-cover bg-gray-800 shadow-2xl shadow-blue-500/10" onerror="this.src='anonym.jpg'">
+                <div id="user-header" class="flex items-center gap-8 mb-10 hidden">
+                    <img id="modal-avatar" src="anonym.jpg" class="w-28 h-28 rounded-[2rem] object-cover bg-gray-800 border-2 border-white/10 shadow-2xl" onerror="this.src='anonym.jpg'">
                     <div>
-                        <h2 id="modal-title-user" class="text-4xl font-black tracking-tight leading-none">Jméno</h2>
-                        <p id="modal-uid" class="text-blue-500 font-mono text-xs mt-2 uppercase tracking-[0.3em] opacity-60"></p>
+                        <h2 id="modal-title-user" class="text-5xl font-black tracking-tighter">Jméno</h2>
+                        <p id="modal-uid" class="text-blue-500 font-mono text-xs mt-3 uppercase tracking-[0.4em] opacity-50"></p>
                     </div>
                 </div>
 
-                <div id="system-header" class="mb-8 hidden text-center">
-                    <h2 class="text-4xl font-black tracking-tighter uppercase text-blue-400">Vytížení Systému</h2>
+                <div id="system-header" class="mb-10 text-center hidden">
+                    <h2 class="text-4xl font-black tracking-tighter uppercase text-blue-400 italic">Analýza Systému</h2>
                 </div>
                 
-                <div class="grid grid-cols-3 gap-4 mb-8">
-                    <div class="bg-white/5 p-5 rounded-3xl text-center">
-                        <p class="text-gray-500 text-[9px] uppercase font-bold tracking-widest mb-1">OK</p>
-                        <p id="modal-ok" class="text-2xl font-black text-emerald-400">0</p>
+                <div class="grid grid-cols-3 gap-6 mb-10">
+                    <div class="bg-white/5 p-6 rounded-3xl text-center border border-white/5">
+                        <p class="text-gray-500 text-[10px] uppercase font-bold tracking-widest mb-2 italic">Povolené</p>
+                        <p id="modal-ok" class="text-3xl font-black text-emerald-400">0</p>
                     </div>
-                    <div class="bg-white/5 p-5 rounded-3xl text-center">
-                        <p class="text-gray-500 text-[9px] uppercase font-bold tracking-widest mb-1">CHYBA</p>
-                        <p id="modal-denied" class="text-2xl font-black text-red-400">0</p>
+                    <div class="bg-white/5 p-6 rounded-3xl text-center border border-white/5">
+                        <p class="text-gray-500 text-[10px] uppercase font-bold tracking-widest mb-2 italic">Odepřené</p>
+                        <p id="modal-denied" class="text-3xl font-black text-red-400">0</p>
                     </div>
-                    <div class="bg-blue-500/10 p-5 rounded-3xl text-center">
-                        <p class="text-blue-400 text-[9px] uppercase font-bold tracking-widest mb-1">Ratio</p>
-                        <p id="modal-ratio" class="text-2xl font-black text-blue-400">0%</p>
+                    <div class="bg-blue-600/20 p-6 rounded-3xl text-center border border-blue-500/20">
+                        <p class="text-blue-400 text-[10px] uppercase font-bold tracking-widest mb-2 italic">Úspěšnost</p>
+                        <p id="modal-ratio" class="text-3xl font-black text-blue-400">0%</p>
                     </div>
                 </div>
 
-                <div class="h-64">
-                    <canvas id="modalChart"></canvas>
+                <div class="space-y-8">
+                    <div>
+                        <p id="chart-label-1" class="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 ml-2 italic">Frekvence všech pokusů</p>
+                        <div class="h-48"><canvas id="modalChartTotal"></canvas></div>
+                    </div>
+                    <div id="extra-charts" class="hidden grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-white/5">
+                        <div>
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-emerald-500/50 mb-4 ml-2 italic text-center">Jen povolené</p>
+                            <div class="h-40"><canvas id="modalChartOk"></canvas></div>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-red-500/50 mb-4 ml-2 italic text-center">Jen odepřené</p>
+                            <div class="h-40"><canvas id="modalChartDenied"></canvas></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        // --- KONFIGURACE DATABÁZE ---
         const userDatabase = {
             "1226DA53": "Dominik Morávek",
             "62CFA051": "Daniel Ulrich"
@@ -121,17 +134,17 @@
 
         let stats = { ok: 0, denied: 0, total: 0 };
         let userData = {}; 
-        let globalHourly = new Array(24).fill(0);
-        let port, modalChartObj;
+        let globalHrTotal = new Array(24).fill(0);
+        let globalHrOk = new Array(24).fill(0);
+        let globalHrDenied = new Array(24).fill(0);
+        
+        let port;
+        let chartObjT, chartObjO, chartObjD;
 
-        const debug = document.getElementById('debug-text');
         const synth = window.speechSynthesis;
-
         function promluv(text) {
             if (synth.speaking) synth.cancel();
-            const u = new SpeechSynthesisUtterance(text);
-            u.lang = 'cs-CZ';
-            synth.speak(u);
+            const u = new SpeechSynthesisUtterance(text); u.lang = 'cs-CZ'; synth.speak(u);
         }
 
         function calculateRatio(ok, denied) {
@@ -139,62 +152,64 @@
             return sum === 0 ? "0%" : Math.round((ok / sum) * 100) + "%";
         }
 
-        // --- GRAFY ---
-        function initModalChart(dataArray, color = '#3b82f6') {
-            const ctx = document.getElementById('modalChart').getContext('2d');
-            if (modalChartObj) modalChartObj.destroy();
-            modalChartObj = new Chart(ctx, {
+        // --- UNIVERZÁLNÍ TVŮRCE GRAFŮ ---
+        function createChart(id, data, color) {
+            const ctx = document.getElementById(id).getContext('2d');
+            return new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: Array.from({length: 24}, (_, i) => i + "h"),
-                    datasets: [{
-                        data: dataArray,
-                        backgroundColor: color + '99',
-                        borderRadius: 8,
-                        hoverBackgroundColor: color
-                    }]
+                    datasets: [{ data: data, backgroundColor: color, borderRadius: 6 }]
                 },
                 options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false,
+                    responsive: true, maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: { 
-                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { stepSize: 1, color: '#475569' } },
-                        x: { grid: { display: false }, ticks: { color: '#475569' } }
+                        y: { beginAtZero: true, grid: { display: false }, ticks: { display: false } },
+                        x: { grid: { display: false }, ticks: { color: '#475569', font: { size: 9 } } }
                     }
                 }
             });
         }
 
-        // --- HANDLERY ---
+        // --- MODÁL: CELKOVÁ AKTIVITA ---
         document.getElementById('show-chart-btn').onclick = () => {
             document.getElementById('user-header').classList.add('hidden');
             document.getElementById('system-header').classList.remove('hidden');
-            document.getElementById('modal-box').classList.replace('max-w-2xl', 'max-w-4xl');
+            document.getElementById('extra-charts').classList.remove('hidden');
+            document.getElementById('chart-label-1').innerText = "Vytížení terminálu (Celkem)";
+            
             document.getElementById('modal-ok').innerText = stats.ok;
             document.getElementById('modal-denied').innerText = stats.denied;
             document.getElementById('modal-ratio').innerText = calculateRatio(stats.ok, stats.denied);
+            
             openModal();
-            initModalChart(globalHourly, '#60a5fa');
+            if(chartObjT) chartObjT.destroy(); if(chartObjO) chartObjO.destroy(); if(chartObjD) chartObjD.destroy();
+            chartObjT = createChart('modalChartTotal', globalHrTotal, '#3b82f6');
+            chartObjO = createChart('modalChartOk', globalHrOk, '#10b981');
+            chartObjD = createChart('modalChartDenied', globalHrDenied, '#ef4444');
         };
 
+        // --- MODÁL: PROFIL UŽIVATELE ---
         function showUserProfile(uid) {
             document.getElementById('system-header').classList.add('hidden');
             document.getElementById('user-header').classList.remove('hidden');
-            document.getElementById('modal-box').classList.replace('max-w-4xl', 'max-w-2xl');
+            document.getElementById('extra-charts').classList.add('hidden');
+            document.getElementById('chart-label-1').innerText = "Historie aktivity uživatele";
             
             const user = userData[uid] || { ok: 0, denied: 0, hourly: new Array(24).fill(0) };
-            const name = userDatabase[uid] || `UID: ${uid}`;
+            const name = userDatabase[uid] || `Neautorizováno (${uid})`;
             
             document.getElementById('modal-title-user').innerText = name;
-            document.getElementById('modal-uid').innerText = `KARTA: ${uid}`;
+            document.getElementById('modal-uid').innerText = `ČIP: ${uid}`;
             document.getElementById('modal-avatar').src = `${uid}.jpg`;
             document.getElementById('modal-ok').innerText = user.ok;
             document.getElementById('modal-denied').innerText = user.denied;
             document.getElementById('modal-ratio').innerText = calculateRatio(user.ok, user.denied);
             
             openModal();
-            initModalChart(user.hourly, '#10b981');
+            if(chartObjT) chartObjT.destroy();
+            chartObjT = createChart('modalChartTotal', user.hourly, '#10b981');
         }
 
         function openModal() { document.getElementById('modal-overlay').classList.add('active'); }
@@ -206,10 +221,10 @@
                 port = await navigator.serial.requestPort();
                 await port.open({ baudRate: 9600 });
                 await port.setSignals({ dataTerminalReady: true, requestToSend: true });
-                debug.innerText = "STAV: AKTIVNÍ";
-                promluv("RFID Systém aktivován.");
+                document.getElementById('debug-text').innerText = "STATUS: ONLINE";
+                promluv("Systém připraven.");
                 readLoop();
-            } catch (e) { debug.innerText = "STAV: CHYBA"; }
+            } catch (e) { document.getElementById('debug-text').innerText = "STATUS: CHYBA"; }
         };
 
         async function readLoop() {
@@ -236,24 +251,28 @@
             if (!uid) return;
 
             if (!userData[uid]) userData[uid] = { ok: 0, denied: 0, hourly: new Array(24).fill(0) };
-            const name = userDatabase[uid] || "Neznámý";
+            const name = userDatabase[uid] || `Neautorizováno (${uid})`;
             
             stats.total++;
+            globalHrTotal[hour]++;
+
             if (type === "ACCESS_OK") {
                 stats.ok++;
                 userData[uid].ok++;
                 userData[uid].hourly[hour]++;
-                globalHourly[hour]++;
+                globalHrOk[hour]++;
                 promluv(`Vítejte, ${name}`);
                 addLogRow(now.toLocaleTimeString('cs-CZ'), uid, name, "POVOLENO", "status-ok");
             } else {
                 stats.denied++;
                 userData[uid].denied++;
-                promluv("Neplatná karta");
-                addLogRow(now.toLocaleTimeString('cs-CZ'), uid, "Neznámý", "ODEPŘENO", "status-denied");
+                // Nepovolené vstupy se u uživatele taky logují do grafu
+                userData[uid].hourly[hour]++; 
+                globalHrDenied[hour]++;
+                promluv("Odepřeno.");
+                addLogRow(now.toLocaleTimeString('cs-CZ'), uid, name, "ODEPŘENO", "status-denied");
             }
 
-            // Update hlavní obrazovky
             document.getElementById('ok-count').innerText = stats.ok;
             document.getElementById('denied-count').innerText = stats.denied;
             document.getElementById('total-count-main').innerText = stats.total;
@@ -263,15 +282,15 @@
         function addLogRow(time, uid, name, status, sClass) {
             const table = document.getElementById('log-table');
             const row = table.insertRow(0);
-            row.className = "border-b border-white/5 hover:bg-white/5 transition-all";
+            row.className = "border-b border-white/5 hover:bg-white/5 transition-all group";
             row.innerHTML = `
-                <td class="p-6 text-gray-500 font-mono text-xs">${time}</td>
-                <td class="p-6 font-bold cursor-pointer"><span class="user-link px-3 py-2" onclick="showUserProfile('${uid}')">${name}</span></td>
-                <td class="p-6 ${sClass} font-black uppercase italic tracking-tighter">${status}</td>
+                <td class="p-7 text-gray-500 font-mono text-[11px]">${time}</td>
+                <td class="p-7 font-bold"><span class="user-link px-3 py-2" onclick="showUserProfile('${uid}')">${name}</span></td>
+                <td class="p-7 ${sClass} font-black uppercase italic text-xs tracking-tighter">${status}</td>
             `;
         }
 
-        document.getElementById('clear-btn').onclick = () => { if(confirm("Restartovat data?")) location.reload(); };
+        document.getElementById('clear-btn').onclick = () => { if(confirm("Restartovat sezení?")) location.reload(); };
     </script>
 </body>
 </html>
